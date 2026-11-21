@@ -31,3 +31,37 @@ jobs:
           assert "--port" in Path('web.py').read_text()
           print('Static smoke checks passed')
           PY
+  windows:
+    runs-on: windows-2025
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install launcher dependencies
+        run: |
+          python -m pip install uv
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          node manager.js install
+      - name: Open the local upload page
+        run: |
+          $server = Start-Process -FilePath node -ArgumentList 'manager.js', 'start' -PassThru -RedirectStandardOutput server.log -RedirectStandardError server-error.log
+          try {
+            foreach ($attempt in 1..30) {
+              if ($server.HasExited) { break }
+              try {
+                $response = Invoke-WebRequest -Uri 'http://127.0.0.1:50881/' -TimeoutSec 2
+                if ($response.Content -match 'Dettato') { return }
+              } catch {
+                Start-Sleep -Seconds 1
+              }
+            }
+            throw 'The Windows launcher did not serve the upload page.'
+          } finally {
+            if (-not $server.HasExited) { taskkill.exe /F /T /PID $server.Id }
+            Get-Content server.log, server-error.log
+          }
