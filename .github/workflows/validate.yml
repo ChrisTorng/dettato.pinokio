@@ -1,0 +1,33 @@
+name: Validate Pinokio launcher
+on:
+  push:
+  pull_request:
+jobs:
+  syntax:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Check JavaScript syntax
+        run: |
+          node --check pinokio.js
+          node --check install.js
+          node --check start.js
+          node --check update.js
+          node --check manager.js
+      - name: Check Python syntax
+        run: python -m py_compile web.py
+      - name: Check wrapper modes and ports
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          assert "const mode='dettato';" in Path('manager.js').read_text()
+          assert "PAGE=r\"\"\"" in Path('web.py').read_text()
+          assert "--port" in Path('web.py').read_text()
+          print('Static smoke checks passed')
+          PY
